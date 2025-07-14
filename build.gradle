@@ -107,6 +107,7 @@ dependencies {
     implementation fg.deobf("maven.modrinth:jade:11.12.2+forge")
     implementation fg.deobf("maven.modrinth:tinkers-construct:3.9.2.37")
     implementation fg.deobf("maven.modrinth:mantle:1.11.44")
+    implementation fg.deobf("maven.modrinth:tooltips-reforged:1.2.3-forge")
 }
 
 processResources {
