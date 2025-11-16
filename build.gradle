@@ -84,6 +84,7 @@ repositories {
     }
 }
 
+// 在dependencies部分，移除Fabric相关依赖，确保只有Forge依赖
 dependencies {
     // To change the versions see the gradle/libs.version.toml
     minecraft "net.minecraftforge:forge:${minecraft_version}-${libs.versions.forge.get()}"
@@ -91,9 +92,6 @@ dependencies {
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
     implementation("io.github.llamalad7:mixinextras-forge:0.4.1")
-
-    compileOnly libs.forgified.fabric.api
-    runtimeOnly fg.deobf(libs.forgified.fabric.api.get().toString())
 
     runtimeOnly fg.deobf(libs.cloth.config.get().toString())
 
@@ -108,6 +106,9 @@ dependencies {
     implementation fg.deobf("maven.modrinth:tinkers-construct:3.9.2.37")
     implementation fg.deobf("maven.modrinth:mantle:1.11.44")
     implementation fg.deobf("maven.modrinth:obscure-tooltips:3.1.1-forge")
+
+    // 确保没有Fabric API依赖
+    // implementation fg.deobf("net.fabricmc:fabric-api:fabric-api-0.91.0+1.20.1")
 }
 
 processResources {
@@ -154,7 +155,7 @@ unifiedPublishing {
                 id = "1131483"
 
                 relations { // Optional, Inferred from the relations above by default
-                    depends "forgified-fabric-api"
+                    // depends "forgified-fabric-api"
                     optional "jade"
                     optional "more-enchantment-info"
                     optional "just-enough-effect-descriptions-jeed"
@@ -168,7 +169,7 @@ unifiedPublishing {
                 id = "fFmpgMfg"
 
                 relations { // Optional, Inferred from the relations above by default
-                    depends "forgified-fabric-api"
+                    // depends "forgified-fabric-api"
                     optional "jade"
                     optional "more-enchantment-info"
                     optional "just-enough-effect-descriptions-jeed"

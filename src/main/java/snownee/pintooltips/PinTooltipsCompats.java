@@ -1,6 +1,11 @@
 package snownee.pintooltips;
 
-import net.fabricmc.loader.api.FabricLoader;
+// 移除Fabric导入
+// import net.fabricmc.loader.api.FabricLoader;
+
+// 添加Forge导入
+import net.minecraftforge.fml.ModList;
+
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -13,9 +18,10 @@ import snownee.pintooltips.compat.JeedCompat;
 import snownee.pintooltips.compat.MEICompat;
 
 public class PinTooltipsCompats {
-	public static boolean jeed = FabricLoader.getInstance().isModLoaded("jeed");
-	public static boolean jade = FabricLoader.getInstance().isModLoaded("jade");
-	public static boolean moreEnchantmentInfo = FabricLoader.getInstance().isModLoaded("more_enchantment_info");
+	// 修改模组检测方式
+	public static boolean jeed = ModList.get().isLoaded("jeed");
+	public static boolean jade = ModList.get().isLoaded("jade");
+	public static boolean moreEnchantmentInfo = ModList.get().isLoaded("more_enchantment_info");
 
 	public static boolean canClickEffect(MobEffectInstance effectInstance) {
 		if (jeed) {
