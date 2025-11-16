@@ -1,21 +1,21 @@
 package snownee.pintooltips;
 
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraftforge.fml.ModList;
 import snownee.jade.api.config.IWailaConfig;
 import snownee.jade.util.ModIdentification;
 import snownee.pintooltips.compat.JeedCompat;
 import snownee.pintooltips.compat.MEICompat;
 
 public class PinTooltipsCompats {
-	public static boolean jeed = FabricLoader.getInstance().isModLoaded("jeed");
-	public static boolean jade = FabricLoader.getInstance().isModLoaded("jade");
-	public static boolean moreEnchantmentInfo = FabricLoader.getInstance().isModLoaded("more_enchantment_info");
+	public static boolean jeed = ModList.get().isLoaded("jeed");
+	public static boolean jade = ModList.get().isLoaded("jade");
+	public static boolean moreEnchantmentInfo = ModList.get().isLoaded("more_enchantment_info");
 
 	public static boolean canClickEffect(MobEffectInstance effectInstance) {
 		if (jeed) {

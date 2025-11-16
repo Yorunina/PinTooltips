@@ -92,9 +92,6 @@ dependencies {
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
     implementation("io.github.llamalad7:mixinextras-forge:0.4.1")
 
-    compileOnly libs.forgified.fabric.api
-    runtimeOnly fg.deobf(libs.forgified.fabric.api.get().toString())
-
     runtimeOnly fg.deobf(libs.cloth.config.get().toString())
 
 //    runtimeOnly fg.deobf("maven.modrinth:prism-lib:1.0.5-forge")
@@ -154,7 +151,6 @@ unifiedPublishing {
                 id = "1131483"
 
                 relations { // Optional, Inferred from the relations above by default
-                    depends "forgified-fabric-api"
                     optional "jade"
                     optional "more-enchantment-info"
                     optional "just-enough-effect-descriptions-jeed"
@@ -168,7 +164,6 @@ unifiedPublishing {
                 id = "fFmpgMfg"
 
                 relations { // Optional, Inferred from the relations above by default
-                    depends "forgified-fabric-api"
                     optional "jade"
                     optional "more-enchantment-info"
                     optional "just-enough-effect-descriptions-jeed"
