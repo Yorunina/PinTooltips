@@ -9,14 +9,14 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.enchantment.Enchantment;
-import snownee.pintooltips.PinTooltips;
+import snownee.pintooltips.PinTooltipsHooks;
 import snownee.pintooltips.util.ComponentDecorator;
 
 @Mixin(Enchantment.class)
 public class EnchantmentMixin {
 	@ModifyReturnValue(method = "getFullname", at = @At("RETURN"))
 	private Component pin_tooltips$getFullname(final Component original, int level) {
-		if (PinTooltips.isGrabbing() && original instanceof MutableComponent component) {
+		if (PinTooltipsHooks.isGrabbing() && original instanceof MutableComponent component) {
 			Enchantment enchantment = (Enchantment) (Object) this;
 			ComponentDecorator.enchantment(component, BuiltInRegistries.ENCHANTMENT.wrapAsHolder(enchantment), level);
 		}

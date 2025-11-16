@@ -12,6 +12,13 @@ import com.google.common.collect.Lists;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -28,21 +35,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.loading.FMLLoader;
-import net.minecraftforge.fml.loading.FMLPaths;
 import snownee.pintooltips.util.DefaultDescriptions;
 
-@Mod(PinTooltips.ID)
-@Mod.EventBusSubscriber(modid = PinTooltips.ID, value = Dist.CLIENT)
-public class PinTooltips {
+public class PinTooltips implements ClientModInitializer {
 	public static final String ID = "pin_tooltips";
 	public static final Logger LOGGER = LogUtils.getLogger();
 	public static final Component CLICK_TO_COPY = Component.translatable("chat.copy.click").withStyle(ChatFormatting.GRAY);
@@ -54,31 +49,156 @@ public class PinTooltips {
 	public static long lastMouseMovedTime;
 	private static boolean hasTooltipInThisFrame;
 
-	public static final KeyMapping GRAB_KEY = new KeyMapping(
+	public static final KeyMapping GRAB_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.pin_tooltips.pin",
 			InputConstants.Type.KEYSYM,
 			InputConstants.KEY_LALT,
 			"key.categories.misc"
-	);
+	));
 
-	public static File configDirectory = FMLPaths.CONFIGDIR.get().toFile();
-	private static boolean validateTranslations = !FMLLoader.isProduction();
-
-	public PinTooltips() {
-		PinTooltipsConfig.save();
-		MinecraftForge.EVENT_BUS.register(this);
-	}
-
-	@Mod.EventBusSubscriber(modid = ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-	public static class ClientModEvents {
-		@SubscribeEvent
-		public static void onKeyRegister(RegisterKeyMappingsEvent event) {
-			event.register(GRAB_KEY);
-		}
-	}
+	public static File configDirectory = FabricLoader.getInstance().getConfigDir().toFile();
+	private static boolean validateTranslations = FabricLoader.getInstance().isDevelopmentEnvironment();
 
 	public static int getMaxZOffset() {
 		return 6000;
+	}
+
+	@Override
+	public void onInitializeClient() {
+		PinTooltipsConfig.save();
+		var service = PinnedTooltipsService.INSTANCE;
+		ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+			if (PinTooltipsConfig.get().screenBlacklist().contains(screen.getClass().getName())) {
+				return;
+			}
+
+			if (validateTranslations && client.level != null &&
+					client.level.registryAccess().registry(Registries.ENCHANTMENT).isPresent()) {
+				validateTranslations = false;
+				validateTranslations();
+			}
+
+			lastMouseMovedTime = 0;
+
+			ScreenKeyboardEvents.afterKeyPress(screen).register((screen1, key, scancode, modifiers) -> {
+				if (shouldShowTooltips(screen1) && GRAB_KEY.matches(key, scancode)) {
+					GRAB_KEY.setDown(true);
+					if (keyPressedFrames < 0) {
+						keyPressedFrames = 0;
+					}
+				}
+			});
+
+			ScreenKeyboardEvents.afterKeyRelease(screen).register((screen1, key, scancode, modifiers) -> {
+				if (shouldShowTooltips(screen1)) {
+					if (service.autoPinnedTooltip() != null && service.focused != service.autoPinnedTooltip()) {
+						service.unpin(service.autoPinnedTooltip());
+					}
+					if (GRAB_KEY.matches(key, scancode)) {
+						GRAB_KEY.setDown(false);
+						keyPressedFrames = -1;
+					}
+				}
+			});
+
+			ScreenMouseEvents.allowMouseClick(screen).register((screen1, mouseX, mouseY, button) -> {
+				if (!shouldShowTooltips(screen1)) {
+					return true;
+				}
+				if (button != InputConstants.MOUSE_BUTTON_LEFT && button != InputConstants.MOUSE_BUTTON_MIDDLE) {
+					return true;
+				}
+				if (button == InputConstants.MOUSE_BUTTON_MIDDLE && GRAB_KEY.isDown()) {
+					service.clearTooltips();
+					return false;
+				}
+				var focused = service.hovered;
+				if (focused != null) {
+					if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+						service.focused = focused;
+						service.placeOnTop(focused);
+					} else {
+						service.unpin(focused);
+					}
+					return false;
+				}
+				return true;
+			});
+
+			ScreenMouseEvents.allowMouseRelease(screen).register((screen1, mouseX, mouseY, button) -> {
+				if (!shouldShowTooltips(screen1)) {
+					return true;
+				}
+				var focused = service.focused;
+				var dragging = service.dragging;
+				service.clearStates();
+				if (service.autoPinnedTooltip() != null && focused != service.autoPinnedTooltip()) {
+					service.unpin(service.autoPinnedTooltip());
+				}
+				if (focused != null) {
+					if (button == InputConstants.MOUSE_BUTTON_LEFT && !dragging) {
+						Style style = focused.getStyleAt(mouseX, mouseY, Minecraft.getInstance().font);
+						if (style != null) {
+							screen1.handleComponentClicked(style);
+						}
+					}
+					return false;
+				}
+				return true;
+			});
+
+			ScreenEvents.afterRender(screen).register((screen1, context, mouseX, mouseY, tickDelta) -> {
+				if (!shouldShowTooltips(screen1)) {
+					return;
+				}
+				if (hasTooltipInThisFrame) {
+					hasTooltipInThisFrame = false;
+					if (lastMouseX != mouseX || lastMouseY != mouseY) {
+						lastMouseX = mouseX;
+						lastMouseY = mouseY;
+						lastMouseMovedTime = System.currentTimeMillis();
+					}
+				} else {
+					lastMouseX = 0;
+					lastMouseY = 0;
+					lastMouseMovedTime = 0;
+				}
+
+				service.hovered = service.findHovered(mouseX, mouseY);
+				var font = Minecraft.getInstance().font;
+				var zOffset = 1;
+				for (var tooltip : service.tooltips()) {
+					context.pose().pushPose();
+					context.pose().translate(0, 0, zOffset);
+					tooltip.render(service, screen1, font, context, mouseX, mouseY);
+					context.pose().popPose();
+					zOffset = Math.min(getMaxZOffset() - 1, zOffset + 400);
+				}
+				PinnedTooltip autoPinnedTooltip = service.autoPinnedTooltip();
+				if (autoPinnedTooltip != null && autoPinnedTooltip.isHovered() && autoPinnedTooltip != service.hovered) {
+					service.unpin(autoPinnedTooltip);
+				}
+				if (service.hovered != null) {
+					service.hovered.hovered();
+					Component hint;
+					if (!GRAB_KEY.isUnbound() && System.currentTimeMillis() / 2000 % 2 == 0) {
+						hint = Component.translatable("gui.pin_tooltips.clear_hint", GRAB_KEY.getTranslatedKeyMessage());
+					} else {
+						hint = Component.translatable("gui.pin_tooltips.unpin_hint");
+					}
+					context.drawCenteredString(font, hint, screen1.width / 2, 4, 0xAAAAAA);
+				}
+			});
+
+			ScreenEvents.remove(screen).register(screen1 -> {
+				PinnedTooltip tooltip = service.autoPinnedTooltip();
+				if (tooltip != null) {
+					service.unpin(tooltip);
+				}
+			});
+		});
+
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> service.clearStates());
 	}
 
 	private static void validateTranslations() {
@@ -107,162 +227,6 @@ public class PinTooltips {
 		}
 		PinTooltipsConfig.setOverride(null);
 		LOGGER.info("Translations validated.");
-	}
-
-	@SubscribeEvent
-	public static void onScreenInit(ScreenEvent.Init.Post event) {
-		Screen screen = event.getScreen();
-		if (PinTooltipsConfig.get().screenBlacklist().contains(screen.getClass().getName())) {
-			return;
-		}
-
-		if (validateTranslations && Minecraft.getInstance().level != null &&
-				Minecraft.getInstance().level.registryAccess().registry(Registries.ENCHANTMENT).isPresent()) {
-			validateTranslations = false;
-			validateTranslations();
-		}
-
-		lastMouseMovedTime = 0;
-	}
-
-	@SubscribeEvent
-	public static void onKeyInput(InputEvent.Key event) {
-		Screen screen = Minecraft.getInstance().screen;
-		if (screen == null || !shouldShowTooltips(screen)) {
-			return;
-		}
-		if (GRAB_KEY.matches(event.getKey(), event.getScanCode())) {
-			if (event.getAction() == InputConstants.PRESS) {
-				GRAB_KEY.setDown(true);
-				if (keyPressedFrames < 0) {
-					keyPressedFrames = 0;
-				}
-			} else if (event.getAction() == InputConstants.RELEASE) {
-				PinnedTooltipsService service = PinnedTooltipsService.INSTANCE;
-				if (service.autoPinnedTooltip() != null && service.focused != service.autoPinnedTooltip()) {
-					service.unpin(service.autoPinnedTooltip());
-				}
-				GRAB_KEY.setDown(false);
-				keyPressedFrames = -1;
-			}
-		}
-	}
-
-	@SubscribeEvent
-	public static void onMouseClick(ScreenEvent.MouseButtonPressed.Pre event) {
-		Screen screen = event.getScreen();
-		if (!shouldShowTooltips(screen)) {
-			return;
-		}
-		int button = event.getButton();
-		if (button != InputConstants.MOUSE_BUTTON_LEFT && button != InputConstants.MOUSE_BUTTON_MIDDLE) {
-			return;
-		}
-		PinnedTooltipsService service = PinnedTooltipsService.INSTANCE;
-		if (button == InputConstants.MOUSE_BUTTON_MIDDLE && GRAB_KEY.isDown()) {
-			service.clearTooltips();
-			event.setCanceled(true);
-			return;
-		}
-		var focused = service.hovered;
-		if (focused != null) {
-			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
-				service.focused = focused;
-				service.placeOnTop(focused);
-			} else {
-				service.unpin(focused);
-			}
-			event.setCanceled(true);
-		}
-	}
-
-	@SubscribeEvent
-	public static void onMouseRelease(ScreenEvent.MouseButtonPressed.Post event) {
-		Screen screen = event.getScreen();
-		if (!shouldShowTooltips(screen)) {
-			return;
-		}
-		PinnedTooltipsService service = PinnedTooltipsService.INSTANCE;
-		var focused = service.focused;
-		var dragging = service.dragging;
-		service.clearStates();
-		if (service.autoPinnedTooltip() != null && focused != service.autoPinnedTooltip()) {
-			service.unpin(service.autoPinnedTooltip());
-		}
-		if (focused != null) {
-			if (event.getButton() == InputConstants.MOUSE_BUTTON_LEFT && !dragging) {
-				Style style = focused.getStyleAt(event.getMouseX(), event.getMouseY(), Minecraft.getInstance().font);
-				if (style != null) {
-					screen.handleComponentClicked(style);
-				}
-			}
-			event.setCanceled(true);
-		}
-	}
-
-	@SubscribeEvent
-	public static void onScreenRender(ScreenEvent.Render.Post event) {
-		Screen screen = event.getScreen();
-		if (!shouldShowTooltips(screen)) {
-			return;
-		}
-		int mouseX = event.getMouseX();
-		int mouseY = event.getMouseY();
-
-		if (hasTooltipInThisFrame) {
-			hasTooltipInThisFrame = false;
-			if (lastMouseX != mouseX || lastMouseY != mouseY) {
-				lastMouseX = mouseX;
-				lastMouseY = mouseY;
-				lastMouseMovedTime = System.currentTimeMillis();
-			}
-		} else {
-			lastMouseX = 0;
-			lastMouseY = 0;
-			lastMouseMovedTime = 0;
-		}
-
-		PinnedTooltipsService service = PinnedTooltipsService.INSTANCE;
-		service.hovered = service.findHovered(mouseX, mouseY);
-		var font = Minecraft.getInstance().font;
-		var zOffset = 1;
-		for (var tooltip : service.tooltips()) {
-			event.getGuiGraphics().pose().pushPose();
-			event.getGuiGraphics().pose().translate(0, 0, zOffset);
-			tooltip.render(service, screen, font, event.getGuiGraphics(), mouseX, mouseY);
-			event.getGuiGraphics().pose().popPose();
-			zOffset = Math.min(getMaxZOffset() - 1, zOffset + 400);
-		}
-		PinnedTooltip autoPinnedTooltip = service.autoPinnedTooltip();
-		if (autoPinnedTooltip != null && autoPinnedTooltip.isHovered() && autoPinnedTooltip != service.hovered) {
-			service.unpin(autoPinnedTooltip);
-		}
-		if (service.hovered != null) {
-			service.hovered.hovered();
-			Component hint;
-			if (!GRAB_KEY.isUnbound() && System.currentTimeMillis() / 2000 % 2 == 0) {
-				hint = Component.translatable("gui.pin_tooltips.clear_hint", GRAB_KEY.getTranslatedKeyMessage());
-			} else {
-				hint = Component.translatable("gui.pin_tooltips.unpin_hint");
-			}
-			event.getGuiGraphics().drawCenteredString(font, hint, screen.width / 2, 4, 0xAAAAAA);
-		}
-	}
-
-	@SubscribeEvent
-	public static void onScreenClose(ScreenEvent.Closing event) {
-		PinnedTooltipsService service = PinnedTooltipsService.INSTANCE;
-		PinnedTooltip tooltip = service.autoPinnedTooltip();
-		if (tooltip != null) {
-			service.unpin(tooltip);
-		}
-	}
-
-	@SubscribeEvent
-	public static void onClientTick(TickEvent.ClientTickEvent event) {
-		if (event.phase == TickEvent.Phase.END) {
-			PinnedTooltipsService.INSTANCE.clearStates();
-		}
 	}
 
 	public static void onDrag(Screen screen, int button, double deltaX, double deltaY) {

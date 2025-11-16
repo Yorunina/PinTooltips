@@ -16,7 +16,7 @@ import slimeknights.tconstruct.library.modifiers.Modifier;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.tools.helper.TooltipUtil;
 import slimeknights.tconstruct.library.tools.nbt.IToolStackView;
-import snownee.pintooltips.PinTooltips;
+import snownee.pintooltips.PinTooltipsHooks;
 
 @Mixin(value = TooltipUtil.class, remap = false)
 public class TooltipUtilMixin {
@@ -32,7 +32,7 @@ public class TooltipUtilMixin {
 			RegistryAccess access,
 			Operation<Component> original) {
 		Component component = original.call(instance, tool, entry, access);
-		if (PinTooltips.isGrabbing()) {
+		if (PinTooltipsHooks.isGrabbing()) {
 			List<Component> list = instance.getDescriptionList(tool, entry);
 			MutableComponent first = Component.empty().append(list.get(0));
 			MutableComponent desc = list.stream()
