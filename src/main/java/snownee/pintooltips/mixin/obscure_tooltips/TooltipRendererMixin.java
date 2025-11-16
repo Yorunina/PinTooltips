@@ -1,68 +1,69 @@
-package snownee.pintooltips.mixin.tooltips_reforged;
+package snownee.pintooltips.mixin.obscure_tooltips;
 
 import java.util.List;
 
 import com.llamalad7.mixinextras.sugar.Local;
 
+import dev.obscuria.tooltips.client.renderer.TooltipRenderer;
 import net.minecraft.client.gui.GuiGraphics;
 
 import org.joml.Vector2ic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import com.iafenvoy.tooltipsreforged.render.TooltipsRenderHelper;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
 import snownee.pintooltips.PinTooltips;
 import snownee.pintooltips.PinnedTooltipsService;
 import snownee.pintooltips.duck.PTGuiGraphics;
 
-@Mixin(value = TooltipsRenderHelper.class)
-public class TooltipsRenderHelperMixin {
+@Mixin(value = TooltipRenderer.class)
+public class TooltipRendererMixin {
 
 	@Inject(
-			method = "drawTooltip",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V")
+			method = "render",
+			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", ordinal = 0)
 	)
 	private static void pin_tooltips$onRender(
-			GuiGraphics context,
+			GuiGraphics graphics,
 			Font font,
 			List<ClientTooltipComponent> components,
-			int x,
-			int y,
+			int mouseX,
+			int mouseY,
 			ClientTooltipPositioner positioner,
-			CallbackInfo ci,
+			CallbackInfoReturnable<Boolean> cir,
 			@Local Vector2ic position) {
-		if (PTGuiGraphics.of(context).pin_tooltips$getRenderingPinned()) {
+		if (PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinned()) {
 			return;
 		}
 		PinTooltips.onRenderTooltip(
 				font,
 				components,
 				position,
-				PTGuiGraphics.of(context).pin_tooltips$getRenderingItemStack());
+				PTGuiGraphics.of(graphics).pin_tooltips$getRenderingItemStack());
 	}
 
 	@Inject(
-			method = "drawTooltip", at = @At(
+			method = "render", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/client/gui/GuiGraphics;drawManaged(Ljava/lang/Runnable;)V"))
+			target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V", ordinal = 1))
 	private static void pin_tooltips$changeZOffset(
-			GuiGraphics context,
-			Font textRenderer,
+			GuiGraphics graphics,
+			Font font,
 			List<ClientTooltipComponent> components,
-			int x,
-			int y,
+			int mouseX,
+			int mouseY,
 			ClientTooltipPositioner positioner,
-			CallbackInfo ci
+			CallbackInfoReturnable<Boolean> cir
 	) {
 		//	Render the unpinned tooltip on top of the pinned tooltip
-		if (!PTGuiGraphics.of(context).pin_tooltips$getRenderingPinned() && !PinnedTooltipsService.INSTANCE.tooltips().isEmpty() || PTGuiGraphics.of(context).pin_tooltips$getRenderingPinnedEvent()) {
-			context.pose().translate(0, 0, PinTooltips.getMaxZOffset());
+		if (!PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinned() && !PinnedTooltipsService.INSTANCE.tooltips().isEmpty() || PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinnedEvent()) {
+			graphics.pose().translate(0, 0, PinTooltips.getMaxZOffset());
 		}
 	}
 }

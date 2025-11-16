@@ -15,6 +15,6 @@
 		"pin.GuiGraphicsMixin",
 		"pin.TooltipRenderUtilMixin",
 		"tconstruct.TooltipUtilMixin",
-		"tooltips_reforged.TooltipsRenderHelperMixin"
+		"obscure_tooltips.TooltipRendererMixin"
 	]
 }
