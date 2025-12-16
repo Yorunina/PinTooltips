@@ -1,23 +1,23 @@
 package snownee.pintooltips.mixin.obscure_tooltips;
 
+import java.awt.*;
 import java.util.List;
 
-import com.llamalad7.mixinextras.sugar.Local;
-
 import dev.obscuria.tooltips.client.TooltipRenderer;
+
 import net.minecraft.client.gui.GuiGraphics;
 
 import org.joml.Vector2ic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import com.llamalad7.mixinextras.sugar.Local;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
-
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
 import snownee.pintooltips.PinTooltips;
 import snownee.pintooltips.PinnedTooltipsService;
 import snownee.pintooltips.duck.PTGuiGraphics;
@@ -27,7 +27,7 @@ public class TooltipRendererMixin {
 
 	@Inject(
 			method = "render",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", ordinal = 1)
+			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", ordinal = 0)
 	)
 	private static void pin_tooltips$onRender(
 			GuiGraphics graphics,
@@ -61,7 +61,6 @@ public class TooltipRendererMixin {
 			ClientTooltipPositioner positioner,
 			CallbackInfoReturnable<Boolean> cir
 	) {
-		//	Render the unpinned tooltip on top of the pinned tooltip
 		if (!PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinned() && !PinnedTooltipsService.INSTANCE.tooltips().isEmpty() || PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinnedEvent()) {
 			graphics.pose().translate(0, 0, PinTooltips.getMaxZOffset());
 		}
