@@ -3,6 +3,8 @@ package snownee.pintooltips;
 import java.util.List;
 import java.util.Map;
 
+import dev.obscuria.tooltips.client.TooltipRenderer;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2d;

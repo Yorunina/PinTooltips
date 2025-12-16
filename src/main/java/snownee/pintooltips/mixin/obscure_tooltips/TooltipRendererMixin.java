@@ -3,12 +3,15 @@ package snownee.pintooltips.mixin.obscure_tooltips;
 import java.awt.*;
 import java.util.List;
 
+import dev.obscuria.tooltips.client.TooltipHelper;
 import dev.obscuria.tooltips.client.TooltipRenderer;
 
 import net.minecraft.client.gui.GuiGraphics;
 
 import org.joml.Vector2ic;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -24,6 +27,8 @@ import snownee.pintooltips.duck.PTGuiGraphics;
 
 @Mixin(value = TooltipRenderer.class)
 public class TooltipRendererMixin {
+	@Unique
+	private static List<ClientTooltipComponent> oriComponents;
 
 	@Inject(
 			method = "render",
@@ -43,7 +48,7 @@ public class TooltipRendererMixin {
 		}
 		PinTooltips.onRenderTooltip(
 				font,
-				components,
+				TooltipRendererMixin.oriComponents,
 				position,
 				PTGuiGraphics.of(graphics).pin_tooltips$getRenderingItemStack());
 	}
@@ -64,5 +69,21 @@ public class TooltipRendererMixin {
 		if (!PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinned() && !PinnedTooltipsService.INSTANCE.tooltips().isEmpty() || PTGuiGraphics.of(graphics).pin_tooltips$getRenderingPinnedEvent()) {
 			graphics.pose().translate(0, 0, PinTooltips.getMaxZOffset());
 		}
+	}
+
+
+	@Inject(
+			method = "render", at = @At(value = "HEAD"),
+			remap = false
+	)
+	private static void pin_tooltips$setComponents(
+			GuiGraphics graphics,
+			Font font,
+			List<ClientTooltipComponent> components,
+			int mouseX,
+			int mouseY,
+			ClientTooltipPositioner positioner,
+			CallbackInfoReturnable<Boolean> cir) {
+		TooltipRendererMixin.oriComponents = components;
 	}
 }
