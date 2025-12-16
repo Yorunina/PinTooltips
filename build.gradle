@@ -105,7 +105,7 @@ dependencies {
     implementation fg.deobf("maven.modrinth:jade:11.12.2+forge")
     implementation fg.deobf("maven.modrinth:tinkers-construct:3.9.2.37")
     implementation fg.deobf("maven.modrinth:mantle:1.11.44")
-    implementation fg.deobf("maven.modrinth:obscure-tooltips:3.1.1-forge")
+    implementation fg.deobf("maven.modrinth:obscure-tooltips:3.8.0-forge")
 
     // 确保没有Fabric API依赖
     // implementation fg.deobf("net.fabricmc:fabric-api:fabric-api-0.91.0+1.20.1")

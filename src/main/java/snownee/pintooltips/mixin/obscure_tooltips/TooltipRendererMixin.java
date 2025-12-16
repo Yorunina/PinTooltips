@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.llamalad7.mixinextras.sugar.Local;
 
-import dev.obscuria.tooltips.client.renderer.TooltipRenderer;
+import dev.obscuria.tooltips.client.TooltipRenderer;
 import net.minecraft.client.gui.GuiGraphics;
 
 import org.joml.Vector2ic;
@@ -27,7 +27,7 @@ public class TooltipRendererMixin {
 
 	@Inject(
 			method = "render",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", ordinal = 0)
+			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V", ordinal = 1)
 	)
 	private static void pin_tooltips$onRender(
 			GuiGraphics graphics,
