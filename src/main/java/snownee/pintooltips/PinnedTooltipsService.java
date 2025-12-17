@@ -14,6 +14,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.world.item.ItemStack;
+import snownee.pintooltips.style.DefaultTooltipStyle;
+import snownee.pintooltips.style.TooltipStyle;
 
 public class PinnedTooltipsService {
 	public static final PinnedTooltipsService INSTANCE = new PinnedTooltipsService();
@@ -52,7 +54,13 @@ public class PinnedTooltipsService {
 		storedDragY = 0;
 	}
 
-	public void pin(Vector2ic position, List<ClientTooltipComponent> components, Font font, ItemStack itemStack, long autoPinnedTimestamp) {
+	public void pin(
+			Vector2ic position,
+			List<ClientTooltipComponent> components,
+			Font font,
+			ItemStack itemStack,
+			long autoPinnedTimestamp,
+			@Nullable TooltipStyle style) {
 		if (autoPinnedTimestamp > 0 && autoPinnedTooltip != null && autoPinnedTooltip.autoPinnedTimestamp == autoPinnedTimestamp) {
 			return;
 		}
@@ -60,6 +68,7 @@ public class PinnedTooltipsService {
 		// Avoid modifying the tooltips when rendering the tooltip hover event that will cause crash.
 		Minecraft.getInstance().tell(() -> {
 			PinnedTooltip tooltip = new PinnedTooltip(
+					style == null ? DefaultTooltipStyle.INSTANCE : style,
 					new Vector2d(position),
 					components,
 					Minecraft.getInstance().getWindow().getGuiScaledWidth(),

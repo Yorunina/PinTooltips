@@ -10,11 +10,11 @@
 		"interact.ItemStackMixin",
 		"interact.PotionUtilsMixin",
 		"interact.ScreenMixin",
+		"obscure_tooltips.TooltipRendererMixin",
 		"pin.AbstractContainerScreenMixin",
 		"pin.GuiGraphicsAccess",
 		"pin.GuiGraphicsMixin",
 		"pin.TooltipRenderUtilMixin",
-		"tconstruct.TooltipUtilMixin",
-		"obscure_tooltips.TooltipRendererMixin"
+		"tconstruct.TooltipUtilMixin"
 	]
 }

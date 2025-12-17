@@ -1,9 +1,22 @@
 package snownee.pintooltips;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import dev.obscuria.tooltips.client.TooltipRenderer;
+import dev.obscuria.tooltips.client.TooltipHelper;
+import dev.obscuria.fragmentum.client.ClientGroupTooltip;
+import dev.obscuria.tooltips.client.TooltipState;
+import dev.obscuria.tooltips.client.component.StackBuffer;
+import dev.obscuria.tooltips.client.tooltip.TooltipScroll;
+import dev.obscuria.tooltips.client.tooltip.layout.ArmorPreviewLayout;
+import dev.obscuria.tooltips.client.tooltip.layout.DefaultLayout;
+import dev.obscuria.tooltips.client.tooltip.layout.ToolPreviewLayout;
+import dev.obscuria.tooltips.client.tooltip.layout.TooltipLayout;
+import dev.obscuria.tooltips.config.ClientConfig;
+
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.TieredItem;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,12 +35,12 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.world.item.ItemStack;
 import snownee.pintooltips.duck.PTContainerScreen;
 import snownee.pintooltips.duck.PTGuiGraphics;
-import snownee.pintooltips.mixin.interact.ClientTextTooltipAccess;
 import snownee.pintooltips.mixin.pin.GuiGraphicsAccess;
+import snownee.pintooltips.style.TooltipStyle;
 import snownee.pintooltips.util.DummyHoveredSlot;
 
 public final class PinnedTooltip implements ClientTooltipPositioner {
-	public static final int TOOLTIP_PADDING = 3;
+	private final TooltipStyle style;
 	private final Vector2d position;
 	private final Vector2i size;
 	private final List<ClientTooltipComponent> components;
@@ -35,22 +48,33 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 	private final Map<Rect2i, ClientTooltipComponent> linesPosition;
 	long autoPinnedTimestamp;
 	private boolean hovered;
+	private ItemStack lastStack;
+	private ItemStack actualStack;
+	private TooltipLayout<?> layout;
+	private TooltipState state;
 
 	public PinnedTooltip(
+			TooltipStyle style,
 			Vector2d position,
 			Vector2i size,
 			List<ClientTooltipComponent> components,
 			long autoPinnedTimestamp,
 			@Nullable DummyHoveredSlot hoveredSlot) {
+		this.style = style;
 		this.position = position;
 		this.size = size;
 		this.components = components;
 		this.autoPinnedTimestamp = autoPinnedTimestamp;
 		this.hoveredSlot = hoveredSlot;
 		this.linesPosition = new Reference2ObjectOpenHashMap<>();
+		this.lastStack = ItemStack.EMPTY;
+		this.actualStack = ItemStack.EMPTY;
+		this.layout = new DefaultLayout();
+		this.state = new EmptyState();
 	}
 
 	public PinnedTooltip(
+			TooltipStyle style,
 			Vector2d position,
 			List<ClientTooltipComponent> components,
 			int screenWidth,
@@ -60,6 +84,7 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 			long autoPinnedTimestamp
 	) {
 		this(
+				style,
 				position,
 				new Vector2i(),
 				components,
@@ -69,24 +94,11 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 	}
 
 	public boolean isHovering(double mouseX, double mouseY) {
-		return mouseX >= position.x() - TOOLTIP_PADDING && mouseX <= position.x() + size.x() + TOOLTIP_PADDING
-				&& mouseY >= position.y() - TOOLTIP_PADDING && mouseY <= position.y() + size.y() + TOOLTIP_PADDING;
+		return style.isHovering(this, mouseX, mouseY);
 	}
 
 	public void updateSize(int screenWidth, int screenHeight, Font font) {
-		var width = 0;
-		var height = 0;
-		linesPosition.clear();
-		for (var component : components) {
-			var componentWidth = component.getWidth(font);
-			var componentHeight = component.getHeight();
-			linesPosition.put(new Rect2i(0, height, componentWidth, componentHeight), component);
-			width = Math.max(width, componentWidth);
-			height += componentHeight;
-		}
-		if (width != size.x() || height != size.y()) {
-			size.set(width, height);
-		}
+		style.updateSize(this, screenWidth, screenHeight, font);
 	}
 
 	public void render(PinnedTooltipsService service, Screen screen, Font font, GuiGraphics context, int mouseX, int mouseY) {
@@ -97,22 +109,21 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 			((PTContainerScreen) screen).pin_tooltips$setDummyHoveredSlot(hoveredSlot());
 		}
 
-		PTGuiGraphics.of(context).pin_tooltips$setRenderingPinned(true);
-		((GuiGraphicsAccess) context).callRenderTooltipInternal(
-				font,
-				components(),
-				(int) position().x(),
-				(int) position().y(),
-				this);
-		PTGuiGraphics.of(context).pin_tooltips$setRenderingPinned(false);
+		PTGuiGraphics graphics = PTGuiGraphics.of(context);
+		graphics.pin_tooltips$setRenderingPinned(true);
+		if (hoveredSlot != null) {
+			graphics.pin_tooltips$setRenderingItemStack(hoveredSlot.getItem());
+		}
+		originalRenderTooltips(context, font, components, mouseX, mouseY, this);
+		graphics.pin_tooltips$setRenderingPinned(false);
 
 		if (service.hovered == this && !service.dragging) {
 			var style = getStyleAt(mouseX, mouseY, font);
 			if (style != null) {
-				PTGuiGraphics.of(context).pin_tooltips$setRenderingPinnedEvent(true);
+				graphics.pin_tooltips$setRenderingPinnedEvent(true);
 				context.pose().translate(0, 0, 1);
 				context.renderComponentHoverEffect(font, style, mouseX, mouseY);
-				PTGuiGraphics.of(context).pin_tooltips$setRenderingPinnedEvent(false);
+				graphics.pin_tooltips$setRenderingPinnedEvent(false);
 			}
 		}
 
@@ -120,6 +131,101 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 			((PTContainerScreen) screen).pin_tooltips$dropDummyHoveredSlot();
 		}
 		context.pose().popPose();
+	}
+
+	public boolean originalRenderTooltips(
+			GuiGraphics graphics,
+			Font font,
+			List<ClientTooltipComponent> components,
+			int mouseX,
+			int mouseY,
+			ClientTooltipPositioner positioner) {
+		if (!(Boolean) ClientConfig.ENABLED.get()) {
+			return false;
+		} else if (components.isEmpty()) {
+			return false;
+		} else if (!perform(components)) {
+			((GuiGraphicsAccess) graphics).callRenderTooltipInternal(
+					font,
+					components,
+					(int) position().x(),
+					(int) position().y(),
+					this);
+			return false;
+		} else {
+			List<ClientTooltipComponent> var14 = new ArrayList(components);
+			List<ClientTooltipComponent> var15 = this.layout.rawProcessPreWrap(state, var14, font);
+			var15 = TooltipHelper.wrapLines(graphics, var15, font);
+			var15 = this.layout.rawProcessPostWrap(this.state, var15, font);
+			Integer margin = ClientConfig.CONTENT_MARGIN.get();
+			int width = margin * 2 + TooltipHelper.widthOf(var15, font);
+			int height = margin * 2 + TooltipHelper.heightOf(var15) - 2;
+			Vector2ic pos = positioner.positionTooltip(graphics.guiWidth(), graphics.guiHeight(), mouseX, mouseY, width, height);
+			TooltipScroll.update(this.state, 6 + height, graphics.guiHeight());
+			graphics.pose().pushPose();
+			graphics.pose().translate(0.0F, TooltipScroll.getScroll(), 400.0F);
+			graphics.flush();
+			this.state.renderPanel(graphics, pos, width, height);
+			this.state.renderEffects(graphics, pos, width, height);
+			graphics.flush();
+			graphics.pose().pushPose();
+			graphics.pose().translate(0.0F, 0.0F, 2.0F);
+			this.state.renderFrame(graphics, pos, width, height);
+			graphics.pose().popPose();
+			graphics.flush();
+			int componentX = margin + pos.x();
+			int componentY = margin + pos.y();
+
+			for (ClientTooltipComponent component : var15) {
+				component.renderText(font, componentX, componentY, graphics.pose().last().pose(), graphics.bufferSource());
+				component.renderImage(font, componentX, componentY, graphics);
+				componentY += component.getHeight();
+			}
+
+			graphics.pose().popPose();
+			this.lastStack = this.actualStack;
+			this.actualStack = ItemStack.EMPTY;
+			this.state.update();
+			return true;
+		}
+	}
+
+	private boolean perform(List<ClientTooltipComponent> components) {
+		StackBuffer buffer = ClientGroupTooltip.findFirst(components, StackBuffer.class);
+		if (buffer == null) {
+			return false;
+		} else {
+			this.actualStack = buffer.stack();
+			if (ItemStack.isSameItemSameTags(lastStack, actualStack)) {
+				return true;
+			} else {
+				this.layout = shouldShowArmorPreview(actualStack) ?
+						ArmorPreviewLayout.INSTANCE :
+						(shouldShowToolPreview(actualStack) ? ToolPreviewLayout.INSTANCE : DefaultLayout.INSTANCE);
+				this.state = this.layout.extractState(actualStack);
+				return true;
+			}
+		}
+	}
+
+	private static boolean shouldShowArmorPreview(ItemStack stack) {
+		if (!(Boolean) ClientConfig.ARMOR_PREVIEW_ENABLED.get()) {
+			return false;
+		} else if (ClientConfig.isInArmorPreviewBlacklist(stack.getItem())) {
+			return false;
+		} else {
+			return stack.getItem() instanceof ArmorItem || ClientConfig.isInArmorPreviewWhitelist(stack.getItem());
+		}
+	}
+
+	private static boolean shouldShowToolPreview(ItemStack stack) {
+		if (!(Boolean) ClientConfig.TOOL_PREVIEW_ENABLED.get()) {
+			return false;
+		} else if (ClientConfig.isInToolPreviewBlacklist(stack.getItem())) {
+			return false;
+		} else {
+			return stack.getItem() instanceof TieredItem || ClientConfig.isInToolPreviewWhitelist(stack.getItem());
+		}
 	}
 
 	public void setPosition(int screenWidth, int screenHeight, double x, double y) {
@@ -135,14 +241,7 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 	public @Nullable DummyHoveredSlot hoveredSlot() {return hoveredSlot;}
 
 	public @Nullable Style getStyleAt(double mouseX, double mouseY, Font font) {
-		var relativeX = (int) (mouseX - position().x());
-		var relativeY = (int) (mouseY - position().y());
-		var line = linesPosition.keySet().stream().filter(rect -> rect.contains(relativeX, relativeY)).findFirst().orElse(null);
-		var component = linesPosition.get(line);
-		if (component instanceof ClientTextTooltipAccess textTooltip) {
-			return font.getSplitter().componentStyleAtWidth(textTooltip.getText(), relativeX);
-		}
-		return null;
+		return style.getStyleAt(this, mouseX, mouseY, font);
 	}
 
 	@Override
@@ -162,5 +261,23 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 
 	public boolean isHovered() {
 		return hovered;
+	}
+
+	public Map<Rect2i, ClientTooltipComponent> linesPosition() {
+		return linesPosition;
+	}
+
+	public TooltipStyle style() {
+		return style;
+	}
+
+	public void setSize(int width, int height) {
+		size.set(width, height);
+	}
+
+	private static final class EmptyState extends TooltipState {
+		private EmptyState() {
+			super(ItemStack.EMPTY);
+		}
 	}
 }

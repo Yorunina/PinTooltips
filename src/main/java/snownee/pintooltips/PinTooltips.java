@@ -39,7 +39,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import snownee.pintooltips.style.TooltipStyle;
 import snownee.pintooltips.util.DefaultDescriptions;
+import javax.annotation.Nullable;
 
 @Mod(PinTooltips.ID)
 public class PinTooltips {
@@ -306,7 +308,8 @@ public class PinTooltips {
 			Font font,
 			List<ClientTooltipComponent> components,
 			Vector2ic position,
-			ItemStack itemStack) {
+			ItemStack itemStack,
+			@Nullable TooltipStyle style) {
 		var service = PinnedTooltipsService.INSTANCE;
 		if (service.focused != null) {
 			return;
@@ -319,7 +322,7 @@ public class PinTooltips {
 			if (delay >= 0) {
 				hasTooltipInThisFrame = true;
 				if (lastMouseMovedTime > 0 && time - lastMouseMovedTime >= delay) {
-					service.pin(position, components, font, itemStack, time);
+					service.pin(position, components, font, itemStack, time, style);
 				}
 			}
 			return;
@@ -336,7 +339,7 @@ public class PinTooltips {
 			return;
 		}
 
-		service.pin(position, components, font, itemStack, -1);
+		service.pin(position, components, font, itemStack, -1, style);
 	}
 
 	public static boolean isGrabbing() {
