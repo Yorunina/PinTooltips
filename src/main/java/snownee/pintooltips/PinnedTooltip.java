@@ -70,7 +70,7 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 		this.lastStack = ItemStack.EMPTY;
 		this.actualStack = ItemStack.EMPTY;
 		this.layout = new DefaultLayout();
-		this.state = new EmptyState();
+		this.state = this.layout.extractState(ItemStack.EMPTY);
 	}
 
 	public PinnedTooltip(
@@ -273,11 +273,5 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 
 	public void setSize(int width, int height) {
 		size.set(width, height);
-	}
-
-	private static final class EmptyState extends TooltipState {
-		private EmptyState() {
-			super(ItemStack.EMPTY);
-		}
 	}
 }
