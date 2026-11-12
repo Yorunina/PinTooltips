@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import dev.obscuria.tooltips.client.TooltipHelper;
-import dev.obscuria.fragmentum.client.ClientGroupTooltip;
+import dev.obscuria.fragmentum.api.client.CompositeClientTooltipComponent;
 import dev.obscuria.tooltips.client.TooltipState;
 import dev.obscuria.tooltips.client.component.StackBuffer;
 import dev.obscuria.tooltips.client.tooltip.TooltipScroll;
@@ -191,7 +191,7 @@ public final class PinnedTooltip implements ClientTooltipPositioner {
 	}
 
 	private boolean perform(List<ClientTooltipComponent> components) {
-		StackBuffer buffer = ClientGroupTooltip.findFirst(components, StackBuffer.class);
+		StackBuffer buffer = (StackBuffer) CompositeClientTooltipComponent.Companion.findFirst(StackBuffer.class, components);
 		if (buffer == null) {
 			return false;
 		} else {
